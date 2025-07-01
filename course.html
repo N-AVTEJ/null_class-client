@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course - LearnHub</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white">
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-gray-900 bg-opacity-80 backdrop-blur-lg border-b border-gray-800">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="index.html" class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">
+                    LearnHub
+                </a>
+                <div class="flex items-center space-x-8">
+                    <a href="groups.html" class="text-white hover:text-purple-400 transition-colors">Groups</a>
+                    <a href="videos.html" class="text-white hover:text-purple-400 transition-colors">Videos</a>
+                    <a href="upgrade.html" class="text-white hover:text-purple-400 transition-colors">Upgrade</a>
+                    <a href="profile.html" class="text-white hover:text-purple-400 transition-colors">Profile</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-24 pb-16">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <!-- Video Player -->
+                <div class="lg:col-span-3">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <div class="aspect-w-16 aspect-h-9">
+                            <video id="courseVideo" 
+                                   class="video-js vjs-big-play-centered"
+                                   controls
+                                   preload="auto"
+                                   width="100%"
+                                   height="100%"
+                                   data-setup='{"fluid": true}'>
+                                <p class="vjs-no-js">
+                                    To view this video please enable JavaScript, and consider upgrading to a
+                                    web browser that supports HTML5 video
+                                </p>
+                            </video>
+                        </div>
+                    </div>
+
+                    <!-- Video Info -->
+                    <div class="mt-6 bg-gray-800 rounded-xl p-6">
+                        <h1 id="courseTitle" class="text-2xl font-bold mb-4">Loading...</h1>
+                        <div class="flex items-center space-x-4 text-gray-400 mb-4">
+                            <span id="courseInstructor">Loading...</span>
+                            <span>•</span>
+                            <span id="courseDuration">Loading...</span>
+                            <span>•</span>
+                            <span id="courseLevel">Loading...</span>
+                        </div>
+                        <p id="courseDescription" class="text-gray-300">Loading...</p>
+                    </div>
+
+                    <!-- Course Resources -->
+                    <div class="mt-6 bg-gray-800 rounded-xl p-6">
+                        <h2 class="text-xl font-bold mb-4">Course Resources</h2>
+                        <div id="courseResources" class="space-y-4">
+                            <!-- Resources will be dynamically added here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Course Content Sidebar -->
+                <div class="lg:col-span-1">
+                    <div class="bg-gray-800 rounded-xl p-6">
+                        <h2 class="text-xl font-bold mb-4">Course Content</h2>
+                        <div id="courseContent" class="space-y-4">
+                            <!-- Course sections and lessons will be dynamically added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <script type="module">
+        import { ApiClient } from './api.js';
+        import { NotificationManager } from './notifications.js';
+        import { LoadingManager } from './loading.js';
+
+        const api = new ApiClient();
+        const notifications = new NotificationManager();
+        const loading = new LoadingManager();
+
+        // Get course ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const courseId = urlParams.get('id');
+
+        if (!courseId) {
+            window.location.href = 'videos.html';
+        }
+
+        // Initialize video player
+        const player = videojs('courseVideo', {
+            controls: true,
+            autoplay: false,
+            preload: 'auto',
+            fluid: true,
+            playbackRates: [0.5, 1, 1.5, 2],
+            controlBar: {
+                children: [
+                    'playToggle',
+                    'volumePanel',
+                    'progressControl',
+                    'currentTimeDisplay',
+                    'timeDivider',
+                    'durationDisplay',
+                    'playbackRateMenuButton',
+                    'fullscreenToggle'
+                ]
+            }
+        });
+
+        // Load course data
+        async function loadCourse() {
+            loading.show();
+            try {
+                const course = await api.getCourse(courseId);
+                
+                // Update course info
+                document.getElementById('courseTitle').textContent = course.title;
+                document.getElementById('courseInstructor').textContent = course.instructor;
+                document.getElementById('courseDuration').textContent = course.duration;
+                document.getElementById('courseLevel').textContent = course.level;
+                document.getElementById('courseDescription').textContent = course.description;
+
+                // Set video source
+                player.src({
+                    src: course.videoUrl,
+                    type: 'video/mp4'
+                });
+
+                // Load course content
+                const contentContainer = document.getElementById('courseContent');
+                contentContainer.innerHTML = course.sections.map(section => `
+                    <div class="mb-6">
+                        <h3 class="font-semibold mb-2">${section.title}</h3>
+                        <div class="space-y-2">
+                            ${section.lessons.map(lesson => `
+                                <button onclick="loadLesson('${lesson.id}')"
+                                        class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors
+                                               ${lesson.id === course.currentLesson ? 'bg-purple-500' : 'bg-gray-700'}">
+                                    <div class="flex items-center justify-between">
+                                        <span>${lesson.title}</span>
+                                        <span class="text-sm text-gray-400">${lesson.duration}</span>
+                                    </div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+
+                // Load resources
+                const resourcesContainer = document.getElementById('courseResources');
+                resourcesContainer.innerHTML = course.resources.map(resource => `
+                    <div class="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-4">
+                            <i class="fas ${getResourceIcon(resource.type)} text-2xl"></i>
+                            <div>
+                                <h4 class="font-semibold">${resource.title}</h4>
+                                <p class="text-sm text-gray-400">${resource.description}</p>
+                            </div>
+                        </div>
+                        <a href="${resource.url}" 
+                           target="_blank"
+                           class="px-4 py-2 bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors">
+                            Download
+                        </a>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                notifications.error('Failed to load course');
+                console.error(error);
+            } finally {
+                loading.hide();
+            }
+        }
+
+        // Helper functions
+        function getResourceIcon(type) {
+            switch (type) {
+                case 'pdf': return 'fa-file-pdf';
+                case 'doc': return 'fa-file-word';
+                case 'code': return 'fa-code';
+                default: return 'fa-file';
+            }
+        }
+
+        // Load lesson
+        window.loadLesson = async (lessonId) => {
+            loading.show();
+            try {
+                const lesson = await api.getLesson(courseId, lessonId);
+                player.src({
+                    src: lesson.videoUrl,
+                    type: 'video/mp4'
+                });
+                player.play();
+            } catch (error) {
+                notifications.error('Failed to load lesson');
+                console.error(error);
+            } finally {
+                loading.hide();
+            }
+        };
+
+        // Save progress
+        player.on('timeupdate', () => {
+            const currentTime = player.currentTime();
+            const duration = player.duration();
+            if (duration && currentTime % 10 < 1) { // Save every 10 seconds
+                api.saveProgress(courseId, currentTime, duration);
+            }
+        });
+
+        // Load course on page load
+        loadCourse();
+    </script>
+</body>
+</html> 
